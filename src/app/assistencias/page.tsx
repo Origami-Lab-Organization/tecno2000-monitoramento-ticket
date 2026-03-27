@@ -116,7 +116,7 @@ export default function AssistenciasPage() {
                     <tr
                       key={at.id}
                       className="hover:bg-blue-50/40 transition-colors duration-150 cursor-pointer group"
-                      onClick={() => window.location.href = `/assistencias/${at.id}`}
+                      onClick={() => window.location.href = `/assistencias/${at.id}?from=assistencias`}
                     >
                       <td className="px-4 py-3 text-sm font-semibold text-slate-900 whitespace-nowrap">{at.pedido || '-'}</td>
                       <td className="px-4 py-3 text-sm text-slate-700 max-w-[180px] truncate font-medium">{at.cliente}</td>

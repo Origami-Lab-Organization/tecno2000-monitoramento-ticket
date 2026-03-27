@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Wrench, LayoutDashboard, PlusCircle, List } from 'lucide-react';
+import { Wrench, LayoutDashboard, PlusCircle, List, Truck } from 'lucide-react';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -9,6 +9,7 @@ export default function Navbar() {
   const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/assistencias', label: 'Assistências', icon: List },
+    { href: '/motoristas', label: 'Por Motorista', icon: Truck },
     { href: '/assistencias/nova', label: 'Nova AT', icon: PlusCircle },
   ];
 
