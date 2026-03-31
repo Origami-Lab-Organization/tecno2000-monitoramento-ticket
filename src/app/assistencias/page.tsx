@@ -46,7 +46,6 @@ export default function AssistenciasPage() {
     <div className="min-h-screen bg-slate-50">
       <Navbar />
       <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Assistências Técnicas</h1>
@@ -58,7 +57,6 @@ export default function AssistenciasPage() {
           </Link>
         </div>
 
-        {/* Filters */}
         <div className="card p-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -84,7 +82,6 @@ export default function AssistenciasPage() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="card overflow-hidden">
           {filtered.length === 0 ? (
             <div className="p-12 text-center">
@@ -116,7 +113,7 @@ export default function AssistenciasPage() {
                     <tr
                       key={at.id}
                       className="hover:bg-blue-50/40 transition-colors duration-150 cursor-pointer group"
-                      onClick={() => window.location.href = `/assistencias/${at.id}?from=assistencias`}
+                      onClick={() => window.location.href = `/assistencias/${at.id}`}
                     >
                       <td className="px-4 py-3 text-sm font-semibold text-slate-900 whitespace-nowrap">{at.pedido || '-'}</td>
                       <td className="px-4 py-3 text-sm text-slate-700 max-w-[180px] truncate font-medium">{at.cliente}</td>
@@ -162,7 +159,6 @@ export default function AssistenciasPage() {
         </div>
       </main>
 
-      {/* Delete modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
@@ -176,12 +172,8 @@ export default function AssistenciasPage() {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="btn-secondary flex-1 justify-center">
-                Cancelar
-              </button>
-              <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 justify-center bg-red-600 text-white hover:bg-red-700 border-0">
-                Excluir
-              </button>
+              <button onClick={() => setDeleteConfirm(null)} className="btn-secondary flex-1 justify-center">Cancelar</button>
+              <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 justify-center bg-red-600 text-white hover:bg-red-700 border-0">Excluir</button>
             </div>
           </div>
         </div>

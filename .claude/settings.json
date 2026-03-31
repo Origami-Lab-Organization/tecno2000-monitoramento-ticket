@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:app.swaggerhub.com)",
+      "Bash(find /Users/italocastro/Projects/tecno2000-monitoramento-ticket -type f -name .env*)",
+      "WebFetch(domain:activecorp.com.br)",
+      "WebFetch(domain:api.swaggerhub.com)",
+      "Bash(curl -s \"https://api.swaggerhub.com/apis/ActiveCorp/TudoEntregue/1.0.17\")"
+    ],
+    "additionalDirectories": [
+      "/Users/italocastro/Projects/tecno2000-monitoramento-ticket/src/app/api"
+    ]
+  }
+}
