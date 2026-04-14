@@ -1,46 +1,106 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import StatusBadge from '@/components/StatusBadge';
-import { getAssistencias, deleteAssistencia } from '@/lib/storage';
-import { Assistencia, StatusAssistencia } from '@/types/assistencia';
-import { PlusCircle, Search, Filter, Trash2, Eye, AlertTriangle, Wrench } from 'lucide-react';
+import { Search, Filter, Wrench, Eye, MapPin, Image as ImageIcon, ChevronDown, ChevronRight, Calendar } from 'lucide-react';
 
-const STATUS_FILTER_OPTIONS: (StatusAssistencia | 'Todos')[] = [
-  'Todos', 'Aberto', 'Em Andamento', 'Aguardando Peças', 'Aguardando Cliente', 'Finalizado', 'Cancelado'
-];
+const NORMAL_CODES = new Set(["01", "04"]);
+
+interface TudoEntregueOccurrence {
+  OccurrenceCode: string;
+  OccurrenceDescription: string;
+  OccurrenceName: string;
+  OccurrenceDocument: string;
+  OccurrenceDate: string;
+  Latitude: number;
+  Longitude: number;
+  Images: { ImageUrl: string }[];
+  Observation: string;
+  Finisher: boolean;
+  ReportProblem: boolean;
+}
+
+interface TudoEntregueOrder {
+  Driver: { Name: string; PhoneNumber: string; Tags: string };
+  DestinationAddress: { Name: string; City: string; State: string };
+  OrderID: string;
+  OrderNumber: string;
+  Documents: { DocumentNumber: string; Volume: number; Weight: number }[];
+  Occurrences: TudoEntregueOccurrence[];
+  DepartureDate: string;
+}
+
+interface ATRow {
+  id: string;
+  pedido: string;
+  nf: string;
+  destino: string;
+  cidadeUF: string;
+  motorista: string;
+  dataPartida: string;
+  ocorrencia: TudoEntregueOccurrence;
+}
+
+type OccFilter = 'Todos' | string;
+
+function formatDate(value: string) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('pt-BR');
+}
 
 export default function AssistenciasPage() {
-  const [assistencias, setAssistencias] = useState<Assistencia[]>([]);
+  const [orders, setOrders] = useState<TudoEntregueOrder[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusAssistencia | 'Todos'>('Todos');
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [occFilter, setOccFilter] = useState<OccFilter>('Todos');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    setAssistencias(getAssistencias());
+    fetch('/api/orders')
+      .then((res) => res.json())
+      .then((data) => setOrders(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const filtered = useMemo(() => {
-    return assistencias
-      .filter(a => {
-        const matchStatus = statusFilter === 'Todos' || a.status === statusFilter;
-        const matchSearch = !search ||
-          a.cliente.toLowerCase().includes(search.toLowerCase()) ||
-          a.pedido.toLowerCase().includes(search.toLowerCase()) ||
-          a.descricaoItem.toLowerCase().includes(search.toLowerCase()) ||
-          a.nfVenda.toLowerCase().includes(search.toLowerCase()) ||
-          a.nfAt.toLowerCase().includes(search.toLowerCase());
-        return matchStatus && matchSearch;
-      })
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [assistencias, search, statusFilter]);
+  // Extrai todas as ATs dos pedidos
+  const { rows, occTypes } = useMemo(() => {
+    const rows: ATRow[] = [];
+    const occTypesSet = new Set<string>();
 
-  const handleDelete = (id: string) => {
-    deleteAssistencia(id);
-    setAssistencias(getAssistencias());
-    setDeleteConfirm(null);
-  };
+    orders.forEach((order) => {
+      order.Occurrences.forEach((occ, i) => {
+        if (NORMAL_CODES.has(occ.OccurrenceCode)) return;
+        const desc = occ.OccurrenceDescription?.trim() || 'Sem descrição';
+        occTypesSet.add(desc);
+        rows.push({
+          id: `${order.OrderID}-${i}`,
+          pedido: order.OrderNumber,
+          nf: order.Documents?.[0]?.DocumentNumber || '-',
+          destino: order.DestinationAddress?.Name || '-',
+          cidadeUF: `${order.DestinationAddress?.City || '-'}/${order.DestinationAddress?.State || '-'}`,
+          motorista: order.Driver?.Name?.trim() || '-',
+          dataPartida: order.DepartureDate,
+          ocorrencia: occ,
+        });
+      });
+    });
+
+    rows.sort((a, b) => new Date(b.ocorrencia.OccurrenceDate).getTime() - new Date(a.ocorrencia.OccurrenceDate).getTime());
+
+    return { rows, occTypes: ['Todos', ...Array.from(occTypesSet).sort()] };
+  }, [orders]);
+
+  const filtered = useMemo(() => {
+    return rows.filter((r) => {
+      const matchOcc = occFilter === 'Todos' || r.ocorrencia.OccurrenceDescription?.trim() === occFilter;
+      const matchSearch = !search ||
+        r.motorista.toLowerCase().includes(search.toLowerCase()) ||
+        r.pedido.toLowerCase().includes(search.toLowerCase()) ||
+        r.destino.toLowerCase().includes(search.toLowerCase()) ||
+        r.ocorrencia.Observation?.toLowerCase().includes(search.toLowerCase());
+      return matchOcc && matchSearch;
+    });
+  }, [rows, search, occFilter]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -49,14 +109,13 @@ export default function AssistenciasPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Assistências Técnicas</h1>
-            <p className="text-slate-500 text-sm mt-1">{filtered.length} registro(s) encontrado(s)</p>
+            <p className="text-slate-500 text-sm mt-1">
+              {loading ? 'Carregando...' : `${filtered.length} ocorrência(s) encontrada(s) de ${rows.length} total`}
+            </p>
           </div>
-          <Link href="/assistencias/nova" className="btn-primary">
-            <PlusCircle className="w-4 h-4" />
-            Nova Assistência
-          </Link>
         </div>
 
+        {/* Filtros */}
         <div className="card p-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -64,7 +123,7 @@ export default function AssistenciasPage() {
               <input
                 type="text"
                 className="input-field pl-9"
-                placeholder="Buscar por cliente, pedido, NF, descrição..."
+                placeholder="Buscar por motorista, pedido, destino ou observação..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -72,36 +131,36 @@ export default function AssistenciasPage() {
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
               <select
-                className="input-field min-w-[160px]"
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as StatusAssistencia | 'Todos')}
+                className="input-field min-w-[200px]"
+                value={occFilter}
+                onChange={e => setOccFilter(e.target.value)}
               >
-                {STATUS_FILTER_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                {occTypes.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
           </div>
         </div>
 
+        {/* Tabela */}
         <div className="card overflow-hidden">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="p-12 text-center">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">Carregando dados do Tudo Entregue...</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
               <Wrench className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <p className="text-slate-500 font-medium">
-                {assistencias.length === 0 ? 'Nenhuma assistência cadastrada' : 'Nenhum resultado encontrado'}
+                {rows.length === 0 ? 'Nenhuma assistência técnica encontrada' : 'Nenhum resultado para o filtro aplicado'}
               </p>
-              {assistencias.length === 0 && (
-                <Link href="/assistencias/nova" className="btn-primary mt-4 inline-flex">
-                  <PlusCircle className="w-4 h-4" />
-                  Criar primeira AT
-                </Link>
-              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[1000px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    {['Pedido', 'Cliente', 'Cidade/UF', 'Emissão', 'Item', 'NF Venda', 'Motorista', 'Status', 'RNC', 'Ações'].map(col => (
+                    {['', 'Pedido', 'NF', 'Destino', 'Cidade/UF', 'Motorista', 'Data', 'Ocorrência', 'Observação'].map(col => (
                       <th key={col} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
                         {col}
                       </th>
@@ -109,75 +168,128 @@ export default function AssistenciasPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map((at) => (
-                    <tr
-                      key={at.id}
-                      className="hover:bg-brand-50/40 transition-colors duration-150 cursor-pointer group"
-                      onClick={() => window.location.href = `/assistencias/${at.id}`}
-                    >
-                      <td className="px-4 py-3 text-sm font-semibold text-slate-900 whitespace-nowrap">{at.pedido || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-slate-700 max-w-[180px] truncate font-medium">{at.cliente}</td>
-                      <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{at.cidadeUF || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
-                        {at.dataEmissao ? new Date(at.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{at.item || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{at.nfVenda || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{at.motoristaResponsavel || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={at.status} /></td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {at.emitirRncPdcva && (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                            <AlertTriangle className="w-3 h-3" />RNC
-                          </span>
+                  {filtered.map((at) => {
+                    const isExpanded = expandedId === at.id;
+                    const occ = at.ocorrencia;
+                    return (
+                      <>
+                        <tr
+                          key={at.id}
+                          className="hover:bg-brand-50/40 transition-colors duration-150 cursor-pointer group"
+                          onClick={() => setExpandedId(isExpanded ? null : at.id)}
+                        >
+                          <td className="px-4 py-3 w-8">
+                            {isExpanded
+                              ? <ChevronDown className="w-4 h-4 text-slate-400" />
+                              : <ChevronRight className="w-4 h-4 text-slate-400" />
+                            }
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-900 whitespace-nowrap">#{at.pedido}</td>
+                          <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{at.nf}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700 max-w-[180px] truncate font-medium" title={at.destino}>{at.destino}</td>
+                          <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{at.cidadeUF}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap font-medium">{at.motorista}</td>
+                          <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{formatDate(occ.OccurrenceDate)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                              occ.ReportProblem
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${occ.ReportProblem ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                              {occ.OccurrenceDescription?.trim()}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-500 max-w-[200px] truncate" title={occ.Observation}>
+                            {occ.Observation || '-'}
+                          </td>
+                        </tr>
+
+                        {/* Detalhe expandido */}
+                        {isExpanded && (
+                          <tr key={`${at.id}-detail`}>
+                            <td colSpan={9} className="bg-slate-50 px-6 py-4">
+                              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                <div>
+                                  <p className="label">Código da Ocorrência</p>
+                                  <p className="text-sm font-medium text-slate-800">{occ.OccurrenceCode}</p>
+                                </div>
+                                <div>
+                                  <p className="label">Recebedor</p>
+                                  <p className="text-sm font-medium text-slate-800">
+                                    {occ.OccurrenceName || '-'}
+                                    {occ.OccurrenceDocument && occ.OccurrenceDocument !== '000000' && occ.OccurrenceDocument !== '' && (
+                                      <span className="text-slate-400 ml-1">({occ.OccurrenceDocument})</span>
+                                    )}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="label">Data/Hora</p>
+                                  <p className="text-sm font-medium text-slate-800">
+                                    {occ.OccurrenceDate ? new Date(occ.OccurrenceDate).toLocaleString('pt-BR') : '-'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="label">Localização</p>
+                                  {occ.Latitude && occ.Latitude !== 0 ? (
+                                    <p className="text-sm font-medium text-slate-800 flex items-center gap-1">
+                                      <MapPin className="w-3.5 h-3.5 text-brand" />
+                                      {occ.Latitude.toFixed(4)}, {occ.Longitude.toFixed(4)}
+                                    </p>
+                                  ) : (
+                                    <p className="text-sm text-slate-400">Sem localização</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {occ.Observation && (
+                                <div className="mt-4">
+                                  <p className="label">Observação completa</p>
+                                  <p className="text-sm text-slate-800 bg-white rounded-lg border border-slate-200 p-3">
+                                    {occ.Observation}
+                                  </p>
+                                </div>
+                              )}
+
+                              {occ.Images?.length > 0 && (
+                                <div className="mt-4">
+                                  <p className="label">Fotos ({occ.Images.length})</p>
+                                  <div className="flex gap-2 mt-1">
+                                    {occ.Images.map((img, j) => (
+                                      <a
+                                        key={j}
+                                        href={img.ImageUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex h-16 w-16 items-center justify-center rounded-lg border border-slate-200 bg-white hover:border-brand transition-colors"
+                                        title="Ver foto"
+                                      >
+                                        <ImageIcon className="h-6 w-6 text-slate-400" />
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="mt-4 flex items-center gap-4 text-xs text-slate-400">
+                                <span>Pedido #{at.pedido}</span>
+                                <span>NF {at.nf}</span>
+                                <span>Partida: {formatDate(at.dataPartida)}</span>
+                                {occ.Finisher && <span className="text-rose-500 font-semibold">Finalizador</span>}
+                                {occ.ReportProblem && <span className="text-rose-500 font-semibold">Problema reportado</span>}
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Link
-                            href={`/assistencias/${at.id}`}
-                            className="p-1.5 text-slate-500 hover:text-brand hover:bg-brand-50 rounded-lg transition-colors"
-                            title="Ver detalhes"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => setDeleteConfirm(at.id)}
-                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Excluir"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                      </>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
       </main>
-
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <Trash2 className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">Confirmar exclusão</h3>
-                <p className="text-sm text-slate-500">Esta ação não pode ser desfeita</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="btn-secondary flex-1 justify-center">Cancelar</button>
-              <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 justify-center bg-red-600 text-white hover:bg-red-700 border-0">Excluir</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

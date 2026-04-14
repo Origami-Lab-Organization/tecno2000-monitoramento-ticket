@@ -8,8 +8,7 @@ export default function Navbar() {
 
   const navItems = [
     { href: '/assistencias', label: 'Assistências', icon: List },
-    { href: '/motoristas', label: 'Por Motorista', icon: Truck },
-    { href: '/assistencias/nova', label: 'Nova AT', icon: PlusCircle },
+    { href: '/motoristas', label: 'Dash por Motorista', icon: Truck },
   ];
 
   return (

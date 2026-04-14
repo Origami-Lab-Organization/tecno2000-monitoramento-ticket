@@ -23,7 +23,8 @@
       "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?page=999999' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
       "Bash(curl -s https://api.tudoentregue.com.br/v1/orders/finish -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
       "Bash(curl -s \"http://localhost:3001/api/orders?calls=30\")",
-      "Bash(curl -s \"http://localhost:3001/api/orders?calls=5\")"
+      "Bash(curl -s \"http://localhost:3001/api/orders?calls=5\")",
+      "Bash(curl -s https://api.tudoentregue.com.br/v1/orders -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')"
     ],
     "additionalDirectories": [
       "/Users/italocastro/Projects/tecno2000-monitoramento-ticket/src/app/api"

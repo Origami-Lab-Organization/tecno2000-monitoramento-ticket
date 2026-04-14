@@ -3,42 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import {
-  Calendar,
   ChevronDown,
   ChevronRight,
   ExternalLink,
   Image as ImageIcon,
   Loader2,
   MapPin,
-  Search,
   ShieldAlert,
   Truck,
 } from "lucide-react";
-
-/* ── Filtros de período ── */
-
-type PeriodFilter = "30d" | "90d" | "6m" | "1y" | "all" | "custom";
-
-const PERIOD_OPTIONS: { value: PeriodFilter; label: string }[] = [
-  { value: "30d", label: "Últimos 30 dias" },
-  { value: "90d", label: "Últimos 90 dias" },
-  { value: "6m", label: "Últimos 6 meses" },
-  { value: "1y", label: "Último ano" },
-  { value: "all", label: "Todo período" },
-  { value: "custom", label: "Personalizado" },
-];
-
-function getPeriodStartDate(period: PeriodFilter): Date | null {
-  if (period === "all") return null;
-  const now = new Date();
-  switch (period) {
-    case "30d": return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
-    case "90d": return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
-    case "6m": return new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
-    case "1y": return new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-    default: return null;
-  }
-}
 
 /* ── Tipos da API TudoEntregue ── */
 
@@ -182,95 +155,29 @@ function getOccColor(occ: TudoEntregueOccurrence) {
 
 /* ── Cache local (localStorage, TTL 5 min) ── */
 
-const CACHE_KEY = "tecno2000_orders_cache";
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutos
-
-function readCache(): TudoEntregueOrder[] | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const { data, timestamp } = JSON.parse(raw);
-    if (Date.now() - timestamp > CACHE_TTL) return null;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(data: TudoEntregueOrder[]) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
-  } catch { /* quota exceeded — ignora */ }
-}
-
 /* ── Componente principal ── */
 
 export default function MotoristasPage() {
   const [orders, setOrders] = useState<TudoEntregueOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [period, setPeriod] = useState<PeriodFilter>("all");
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
-    // 1. Tenta carregar do cache primeiro (instantâneo)
-    const cached = readCache();
-    if (cached) {
-      setOrders(cached);
-      setLoading(false);
-      setLastUpdated(new Date(JSON.parse(localStorage.getItem(CACHE_KEY)!).timestamp));
-    }
-
-    // 2. Busca da API (em background se já tem cache)
-    if (cached) setRefreshing(true);
-
     fetch("/api/orders")
       .then((res) => {
         if (!res.ok) throw new Error(`Erro ${res.status}`);
         return res.json();
       })
-      .then((data) => {
-        setOrders(data);
-        writeCache(data);
-        setLastUpdated(new Date());
-      })
-      .catch((err) => {
-        if (!cached) setError(err.message);
-      })
-      .finally(() => {
-        setLoading(false);
-        setRefreshing(false);
-      });
+      .then((data) => setOrders(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
   }, []);
 
   const dashboard = useMemo(() => {
-    // Filtro de data
-    let startDate: Date | null = null;
-    let endDate: Date | null = null;
-
-    if (period === "custom") {
-      if (customStart) startDate = new Date(customStart + "T00:00:00");
-      if (customEnd) endDate = new Date(customEnd + "T23:59:59");
-    } else {
-      startDate = getPeriodStartDate(period);
-    }
-
-    const dateFiltered = orders.filter((o) => {
-      const dep = o.DepartureDate ? new Date(o.DepartureDate) : null;
-      if (!dep) return false;
-      if (startDate && dep < startDate) return false;
-      if (endDate && dep > endDate) return false;
-      return true;
-    });
-
-    // Só pedidos que têm pelo menos 1 assistência técnica (ocorrência fora do fluxo normal)
-    const ordersWithOcc = dateFiltered.filter((o) =>
+    // Só pedidos que têm pelo menos 1 assistência técnica
+    const ordersWithOcc = orders.filter((o) =>
       o.Occurrences.some((occ) => isAssistenciaTecnica(occ))
     );
 
@@ -364,17 +271,11 @@ export default function MotoristasPage() {
           b.latestDate - a.latestDate
       );
 
-    const filteredRows = rows.filter(
-      (row) =>
-        !search ||
-        row.nome.toLowerCase().includes(search.toLowerCase()) ||
-        row.topDestino.toLowerCase().includes(search.toLowerCase()) ||
-        row.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
-    );
+    const filteredRows = rows;
 
     const totalOrders = ordersWithOcc.length;
     const totalOccurrences = ordersWithOcc.reduce((s, o) => s + o.Occurrences.length, 0);
-    const totalEntregues = rows.reduce((s, r) => s + r.entregues, 0);
+    const totalEntregas = rows.reduce((s, r) => s + r.entregues, 0);
     const totalATs = rows.reduce((s, r) => s + r.totalATs, 0);
     const highestTotal = Math.max(...rows.map((r) => r.totalPedidos), 1);
     const spotlight = rows[0] || null;
@@ -382,6 +283,7 @@ export default function MotoristasPage() {
     const topOccurrences = Object.entries(
       ordersWithOcc.reduce<Record<string, number>>((acc, order) => {
         order.Occurrences.forEach((occ) => {
+          if (!isAssistenciaTecnica(occ)) return;
           const desc = occ.OccurrenceDescription?.trim() || "Sem descrição";
           acc[desc] = (acc[desc] || 0) + 1;
         });
@@ -396,13 +298,13 @@ export default function MotoristasPage() {
       filteredRows,
       totalOrders,
       totalOccurrences,
-      totalEntregues,
+      totalEntregas,
       totalATs,
       highestTotal,
       spotlight,
       topOccurrences,
     };
-  }, [orders, search, period, customStart, customEnd]);
+  }, [orders]);
 
   const toggle = (nome: string) =>
     setExpanded((prev) => (prev === nome ? null : nome));
@@ -428,52 +330,18 @@ export default function MotoristasPage() {
                 Volume de ocorrências registradas no Tudo Entregue por motorista.
                 Só aparecem pedidos com pelo menos uma ocorrência.
               </p>
-              <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
-                {refreshing && (
-                  <span className="inline-flex items-center gap-1.5 text-brand-200">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Atualizando...
-                  </span>
-                )}
-                {lastUpdated && !refreshing && (
-                  <span>Atualizado às {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
-                )}
-              </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">
-                  Ocorrências
-                </p>
-                <p className="mt-2 text-3xl font-black">
-                  {loading ? "-" : dashboard.totalOccurrences}
-                </p>
-                <p className="mt-1 text-xs text-slate-300">
-                  Total registradas
-                </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm min-h-[100px]">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Pedidos</p>
+                <p className="text-3xl font-black">{loading ? "-" : dashboard.totalOrders}</p>
+                <p className="text-xs text-slate-300">Com assistência técnica</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">
-                  Pedidos
-                </p>
-                <p className="mt-2 text-3xl font-black text-emerald-300">
-                  {loading ? "-" : dashboard.totalOrders}
-                </p>
-                <p className="mt-1 text-xs text-slate-300">
-                  No período filtrado
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">
-                  Assist. Técnicas
-                </p>
-                <p className="mt-2 text-3xl font-black text-rose-300">
-                  {loading ? "-" : dashboard.totalATs}
-                </p>
-                <p className="mt-1 text-xs text-slate-300">
-                  Transbordo, sinistro, recusa, etc.
-                </p>
+              <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm min-h-[100px]">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Assist. Técnicas</p>
+                <p className="text-3xl font-black text-rose-300">{loading ? "-" : dashboard.totalATs}</p>
+                <p className="text-xs text-slate-300">Fora do fluxo normal</p>
               </div>
             </div>
           </div>
@@ -506,141 +374,23 @@ export default function MotoristasPage() {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
-                    Painel de leitura rápida
+                    Painel de detalhamento
                   </p>
                   <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">
-                    Ranking de motoristas
+                    Motoristas x Ocorrências
                   </h2>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center w-full max-w-2xl">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      className="input-field rounded-2xl border-slate-200 bg-slate-50 pl-9"
-                      placeholder="Buscar motorista, destino ou placa..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                    <select
-                      className="input-field rounded-2xl border-slate-200 bg-slate-50 min-w-[160px]"
-                      value={period}
-                      onChange={(e) => setPeriod(e.target.value as PeriodFilter)}
-                    >
-                      {PERIOD_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
               </div>
 
-              {/* Filtro de data personalizado */}
-              {period === "custom" && (
-                <div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <Calendar className="h-4 w-4 text-brand flex-shrink-0" />
-                  <div className="flex items-center gap-2 text-sm">
-                    <label className="text-slate-500 font-medium">De:</label>
-                    <input
-                      type="date"
-                      className="input-field rounded-xl py-1.5 max-w-[160px]"
-                      value={customStart}
-                      onChange={(e) => setCustomStart(e.target.value)}
-                    />
-                    <label className="text-slate-500 font-medium">Até:</label>
-                    <input
-                      type="date"
-                      className="input-field rounded-xl py-1.5 max-w-[160px]"
-                      value={customEnd}
-                      onChange={(e) => setCustomEnd(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Cards resumo */}
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {/* Card resumo */}
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Motoristas
-                  </p>
-                  <p className="mt-2 text-3xl font-black text-slate-900">
-                    {dashboard.rows.length}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">Com ocorrências</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Motoristas</p>
+                  <p className="mt-2 text-3xl font-black text-slate-900">{dashboard.rows.length}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Total ocorrências
-                  </p>
-                  <p className="mt-2 text-3xl font-black text-brand">
-                    {dashboard.totalOccurrences}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">Registradas no sistema</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Média/motorista
-                  </p>
-                  <p className="mt-2 text-3xl font-black text-slate-900">
-                    {dashboard.rows.length
-                      ? (dashboard.totalOccurrences / dashboard.rows.length).toFixed(1)
-                      : "0"}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">Ocorrências por motorista</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Maior volume
-                  </p>
-                  <p className="mt-2 text-lg font-black text-slate-900">
-                    {dashboard.spotlight?.nome || "-"}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {dashboard.spotlight
-                      ? `${dashboard.spotlight.totalPedidos} pedido(s), ${dashboard.spotlight.totalOcorrencias} ocorrência(s)`
-                      : "Sem dados"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Legenda */}
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-3">
-                  Legenda dos indicadores
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-1 h-3 w-3 rounded-full bg-brand flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-slate-800">Ocorrências</p>
-                      <p className="text-xs text-slate-500">Todas as ocorrências registradas no Tudo Entregue (entregas + descargas + ATs)</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-1 h-3 w-3 rounded-full bg-emerald-500 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-slate-800">Entregues</p>
-                      <p className="text-xs text-slate-500">Pedidos finalizados com sucesso pelo motorista (código 01 - ENTREGUE)</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-1 h-3 w-3 rounded-full bg-rose-500 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-slate-800">Assist. Técnicas</p>
-                      <p className="text-xs text-slate-500">Ocorrências fora do fluxo normal: transbordo, sinistro, recusa, divergência, devolução</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-1 h-3 w-3 rounded-full bg-slate-400 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-slate-800">Pedidos</p>
-                      <p className="text-xs text-slate-500">Total de pedidos com pelo menos uma ocorrência registrada no período</p>
-                    </div>
-                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Assist. Técnicas</p>
+                  <p className="mt-2 text-3xl font-black text-rose-600">{dashboard.totalATs}</p>
                 </div>
               </div>
 
@@ -659,7 +409,6 @@ export default function MotoristasPage() {
                 ) : (
                   dashboard.filteredRows.map((row, index) => {
                     const tone = getDriverTone(row);
-                    const totalWidth = `${(row.totalPedidos / dashboard.highestTotal) * 100}%`;
 
                     return (
                       <div
@@ -704,50 +453,14 @@ export default function MotoristasPage() {
                                   </div>
                                 </div>
 
-                                <div className="mt-4 grid gap-3 sm:grid-cols-5">
-                                  <div>
-                                    <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                      <span>Pedidos</span>
-                                      <span>{row.totalPedidos}</span>
-                                    </div>
-                                    <div className="mt-2 h-2.5 rounded-full bg-slate-100">
-                                      <div
-                                        className={`h-2.5 rounded-full bg-gradient-to-r ${tone.bar}`}
-                                        style={{ width: totalWidth }}
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="rounded-2xl bg-brand-50 px-3 py-2 text-center">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand">
-                                      Ocorrências
-                                    </p>
-                                    <p className="mt-1 text-lg font-black text-brand-700">
-                                      {row.totalOcorrencias}
-                                    </p>
-                                  </div>
-                                  <div className="rounded-2xl bg-emerald-50 px-3 py-2 text-center">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
-                                      Entregues
-                                    </p>
-                                    <p className="mt-1 text-lg font-black text-emerald-700">
-                                      {row.entregues}
-                                    </p>
-                                  </div>
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                                   <div className="rounded-2xl bg-rose-50 px-3 py-2 text-center">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600">
-                                      Assist. Técnicas
-                                    </p>
-                                    <p className="mt-1 text-lg font-black text-rose-700">
-                                      {row.totalATs}
-                                    </p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600">Assist. Técnicas</p>
+                                    <p className="mt-1 text-lg font-black text-rose-700">{row.totalATs}</p>
                                   </div>
                                   <div className="rounded-2xl bg-slate-50 px-3 py-2 text-center">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                      Última entrega
-                                    </p>
-                                    <p className="mt-1 text-sm font-bold text-slate-900">
-                                      {formatDate(row.orders[0]?.dataPartida)}
-                                    </p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Última entrega</p>
+                                    <p className="mt-1 text-sm font-bold text-slate-900">{formatDate(row.orders[0]?.dataPartida)}</p>
                                   </div>
                                 </div>
                               </div>
@@ -857,11 +570,11 @@ export default function MotoristasPage() {
                                     {row.orders.length} pedido(s) — clique para ver ocorrências
                                   </p>
                                 </div>
-                                <div className="overflow-x-auto">
-                                  <table className="min-w-[700px] w-full">
+                                <div>
+                                  <table className="w-full">
                                     <thead>
                                       <tr className="border-b border-slate-200 bg-white">
-                                        {["Pedido", "NF", "Destino", "Cidade/UF", "Data", "Status"].map(
+                                        {["Pedido", "NF", "Destino", "Cidade/UF", "Data"].map(
                                           (col) => (
                                             <th
                                               key={col}
@@ -904,11 +617,6 @@ export default function MotoristasPage() {
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-500">
                                               {formatDate(order.dataPartida)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm">
-                                              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                                                {order.ultimoStatus}
-                                              </span>
                                             </td>
                                           </tr>
 
@@ -1004,57 +712,57 @@ export default function MotoristasPage() {
               <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-brand-700 bg-brand-700 px-5 py-4 text-white">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-200">
-                    Spotlight
+                    Ranking
                   </p>
                   <h2 className="mt-1 text-xl font-black">
-                    Motorista com mais ocorrências
+                    Motoristas x Ocorrências
                   </h2>
                 </div>
-                <div className="p-5">
-                  {dashboard.spotlight ? (
-                    <>
-                      <p className="text-lg font-black text-slate-900">
-                        {dashboard.spotlight.nome}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Maior volume de ocorrências registradas.
-                      </p>
-                      <div className="mt-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                        <div className="rounded-2xl bg-brand-50 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
-                            Pedidos
-                          </p>
-                          <p className="mt-2 text-3xl font-black text-brand-700">
-                            {dashboard.spotlight.totalPedidos}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-emerald-50 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                            Entregues
-                          </p>
-                          <p className="mt-2 text-3xl font-black text-emerald-700">
-                            {dashboard.spotlight.entregues}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-rose-50 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-600">
-                            Assist. Técnicas
-                          </p>
-                          <p className="mt-2 text-3xl font-black text-rose-700">
-                            {dashboard.spotlight.totalATs}
-                          </p>
-                        </div>
-                      </div>
-                    </>
+                <div className="divide-y divide-slate-100">
+                  {dashboard.rows.length === 0 ? (
+                    <p className="p-5 text-sm text-slate-500">Sem dados para ranking.</p>
                   ) : (
-                    <p className="text-sm text-slate-500">Sem dados para análise.</p>
+                    dashboard.rows.map((row, i) => {
+                      const maxOcc = dashboard.rows[0]?.totalOcorrencias || 1;
+                      const pct = (row.totalOcorrencias / maxOcc) * 100;
+                      return (
+                        <div key={row.nome} className="px-5 py-3 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-[10px] font-black text-white flex-shrink-0">
+                                {i + 1}
+                              </span>
+                              <p className="text-sm font-semibold text-slate-800 truncate">
+                                {row.nome}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                              {row.totalATs > 0 && (
+                                <span className="text-xs font-bold text-rose-600">
+                                  {row.totalATs} AT{row.totalATs !== 1 ? "s" : ""}
+                                </span>
+                              )}
+                              <span className="text-sm font-black text-slate-900 w-8 text-right">
+                                {row.totalOcorrencias}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-1.5 ml-8 h-1.5 rounded-full bg-slate-100">
+                            <div
+                              className="h-1.5 rounded-full bg-gradient-to-r from-brand to-brand-300"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
 
               <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Ocorrências mais registradas
+                  ATs mais frequentes
                 </p>
                 <div className="mt-4 space-y-3">
                   {dashboard.topOccurrences.map(([desc, count]) => (
@@ -1063,13 +771,13 @@ export default function MotoristasPage() {
                         <p className="max-w-[80%] font-semibold text-slate-700">
                           {desc}
                         </p>
-                        <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                        <span className="text-xs font-bold uppercase tracking-[0.18em] text-rose-500">
                           {count}
                         </span>
                       </div>
                       <div className="mt-2 h-2 rounded-full bg-slate-100">
                         <div
-                          className="h-2 rounded-full bg-gradient-to-r from-brand via-brand-300 to-brand-200"
+                          className="h-2 rounded-full bg-gradient-to-r from-rose-500 to-rose-300"
                           style={{
                             width: `${
                               (count /
@@ -1082,34 +790,34 @@ export default function MotoristasPage() {
                     </div>
                   ))}
                   {dashboard.topOccurrences.length === 0 && (
-                    <p className="text-sm text-slate-400">Sem ocorrências registradas.</p>
+                    <p className="text-sm text-slate-400">Nenhuma AT registrada.</p>
                   )}
                 </div>
               </div>
 
               <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Resumo
+                  Visão geral
                 </p>
-                <div className="mt-4 space-y-3 text-sm text-slate-600">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="font-semibold text-slate-900">Volume</p>
-                    <p className="mt-1">
-                      {dashboard.rows.length} motorista(s) com {dashboard.totalOrders} pedido(s) finalizado(s) no Tudo Entregue.
-                    </p>
+                <div className="mt-4 space-y-2 text-sm">
+                  <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Motoristas com AT</span>
+                    <span className="font-black text-slate-900">{dashboard.rows.length}</span>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="font-semibold text-slate-900">Assistências Técnicas</p>
-                    <p className="mt-1">
-                      {dashboard.totalATs} assistência(s) técnica(s) registrada(s) (transbordo, sinistro, recusa, divergência, etc.)
-                    </p>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Total de ATs</span>
+                    <span className="font-black text-rose-600">{dashboard.totalATs}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Média por motorista</span>
+                    <span className="font-black text-slate-900">
+                      {dashboard.rows.length ? (dashboard.totalATs / dashboard.rows.length).toFixed(1) : "0"}
+                    </span>
                   </div>
                   {dashboard.spotlight && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="font-semibold text-slate-900">Destaque</p>
-                      <p className="mt-1">
-                        {dashboard.spotlight.nome} lidera com {dashboard.spotlight.totalPedidos} pedido(s) e {dashboard.spotlight.totalOcorrencias} ocorrência(s).
-                      </p>
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-slate-500">Maior concentração</span>
+                      <span className="font-black text-slate-900">{dashboard.spotlight.nome}</span>
                     </div>
                   )}
                 </div>
