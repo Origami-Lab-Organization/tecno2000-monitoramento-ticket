@@ -314,34 +314,32 @@ export default function MotoristasPage() {
       <Navbar />
       <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4 py-8 sm:px-6">
         {/* ── Hero ── */}
-        <section className="relative overflow-hidden rounded-[28px] border border-brand-700 bg-brand-700 px-6 py-7 text-white shadow-[0_30px_80px_-40px_rgba(0,93,119,0.75)] sm:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(0,93,119,0.35),transparent_30%),radial-gradient(circle_at_85%_15%,rgba(112,111,111,0.22),transparent_24%),linear-gradient(135deg,rgba(0,74,95,0.95),rgba(0,56,71,0.98))]" />
-          <div className="absolute right-0 top-0 h-44 w-44 translate-x-10 -translate-y-10 rounded-full bg-white/10 blur-3xl" />
-          <div className="relative grid gap-6 lg:grid-cols-[1.4fr_0.9fr] lg:items-end">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-brand-100">
-                <Truck className="h-3.5 w-3.5" />
-                Radar de Motoristas
-              </span>
-              <h1 className="mt-4 max-w-2xl text-3xl font-black tracking-tight text-white sm:text-4xl">
-                Ocorrências por motorista
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                Volume de ocorrências registradas no Tudo Entregue por motorista.
-                Só aparecem pedidos com pelo menos uma ocorrência.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm min-h-[100px]">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Pedidos</p>
-                <p className="text-3xl font-black">{loading ? "-" : dashboard.totalOrders}</p>
-                <p className="text-xs text-slate-300">Com assistência técnica</p>
+        <section className="relative overflow-hidden rounded-[28px] border border-brand-700 bg-brand-700 px-6 py-6 text-white shadow-[0_20px_60px_-30px_rgba(0,93,119,0.6)] sm:px-8">
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(0,74,95,0.95),rgba(0,56,71,0.98))]" />
+          <div className="absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-white/5 blur-2xl" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm">
+                <Truck className="h-6 w-6" />
               </div>
-              <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm min-h-[100px]">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Assist. Técnicas</p>
+              <div>
+                <h1 className="text-xl font-black tracking-tight sm:text-2xl">
+                  Assistências Técnicas por Motorista
+                </h1>
+                <p className="mt-0.5 text-sm text-slate-300">
+                  Dados do Tudo Entregue — pedidos com ocorrências fora do fluxo normal
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <p className="text-3xl font-black">{loading ? "-" : dashboard.rows.length}</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Motoristas</p>
+              </div>
+              <div className="h-10 w-px bg-white/20" />
+              <div className="text-center">
                 <p className="text-3xl font-black text-rose-300">{loading ? "-" : dashboard.totalATs}</p>
-                <p className="text-xs text-slate-300">Fora do fluxo normal</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Assist. Técnicas</p>
               </div>
             </div>
           </div>
