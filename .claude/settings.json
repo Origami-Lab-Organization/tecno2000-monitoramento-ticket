@@ -5,7 +5,25 @@
       "Bash(find /Users/italocastro/Projects/tecno2000-monitoramento-ticket -type f -name .env*)",
       "WebFetch(domain:activecorp.com.br)",
       "WebFetch(domain:api.swaggerhub.com)",
-      "Bash(curl -s \"https://api.swaggerhub.com/apis/ActiveCorp/TudoEntregue/1.0.17\")"
+      "Bash(curl -s \"https://api.swaggerhub.com/apis/ActiveCorp/TudoEntregue/1.0.17\")",
+      "Bash(curl -s \"http://localhost:3099/api/orders\")",
+      "Bash(curl -s \"http://localhost:3001/api/orders\")",
+      "Bash(curl -s \"http://localhost:3001/api/occurrences\")",
+      "Bash(python3 -c ':*)",
+      "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?page=2' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Count: {len\\(d\\)}'\\); print\\(f'First date: {d[0][\\\\\"DepartureDate\\\\\"][:10] if d else \\\\\"N/A\\\\\"}'\\); print\\(f'Last date: {d[-1][\\\\\"DepartureDate\\\\\"][:10] if d else \\\\\"N/A\\\\\"}'\\)\")",
+      "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?page=__TRACKED_VAR__' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?startDate=2025-01-01&endDate=2025-04-14' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?__TRACKED_VAR__' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?departureDateStart=2025-03-01&departureDateEnd=2025-04-14' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?departureDateStart=2025-03-01&departureDateEnd=2025-04-14&page=1' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?departureDateStart=2025-03-01&departureDateEnd=2025-04-14&page=50' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(time curl:*)",
+      "Bash(curl -s https://api.tudoentregue.com.br/v1/__TRACKED_VAR__ -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(curl -s 'https://api.tudoentregue.com.br/v1/orders/finish?page=999999' -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(curl -s https://api.tudoentregue.com.br/v1/orders/finish -H 'AppKey: d9f7fd78-c8f0-47b5-a5a3-c3514ee0dd40' -H 'RequesterKey: 21d3497c-f1ff-4379-840e-114512e8aff6' -H 'Content-Type: application/json')",
+      "Bash(curl -s \"http://localhost:3001/api/orders?calls=30\")",
+      "Bash(curl -s \"http://localhost:3001/api/orders?calls=5\")"
     ],
     "additionalDirectories": [
       "/Users/italocastro/Projects/tecno2000-monitoramento-ticket/src/app/api"

@@ -1,24 +1,60 @@
 import { Assistencia } from '@/types/assistencia';
-import { mockAssistencias } from './mockData';
 
 const STORAGE_KEY = 'tecno2000_assistencias';
-const SEED_KEY = 'tecno2000_seeded';
+const STORAGE_EVENT = 'tecno2000-assistencias-updated';
 
-export function seedMockData(): void {
-  if (typeof window === 'undefined') return;
-  if (localStorage.getItem(SEED_KEY)) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(mockAssistencias));
-  localStorage.setItem(SEED_KEY, 'true');
+let cachedRawAssistencias: string | null | undefined;
+let cachedAssistencias: Assistencia[] = [];
+
+function emitAssistenciasUpdate() {
+  window.dispatchEvent(new Event(STORAGE_EVENT));
+}
+
+function readAssistenciasFromStorage(): Assistencia[] {
+  const data = localStorage.getItem(STORAGE_KEY);
+
+  if (data === cachedRawAssistencias) {
+    return cachedAssistencias;
+  }
+
+  cachedRawAssistencias = data;
+
+  if (!data) {
+    cachedAssistencias = [];
+    return cachedAssistencias;
+  }
+
+  try {
+    cachedAssistencias = JSON.parse(data);
+  } catch {
+    cachedAssistencias = [];
+  }
+
+  return cachedAssistencias;
 }
 
 export function getAssistencias(): Assistencia[] {
   if (typeof window === 'undefined') return [];
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
+  return readAssistenciasFromStorage();
+}
+
+export function getAssistenciasSnapshot(): Assistencia[] {
+  if (typeof window === 'undefined') return [];
+  return readAssistenciasFromStorage();
+}
+
+export function subscribeAssistencias(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const handleChange = () => onStoreChange();
+
+  window.addEventListener(STORAGE_EVENT, handleChange);
+  window.addEventListener('storage', handleChange);
+
+  return () => {
+    window.removeEventListener(STORAGE_EVENT, handleChange);
+    window.removeEventListener('storage', handleChange);
+  };
 }
 
 export function saveAssistencia(assistencia: Omit<Assistencia, 'id' | 'createdAt' | 'updatedAt'>): Assistencia {
@@ -32,6 +68,7 @@ export function saveAssistencia(assistencia: Omit<Assistencia, 'id' | 'createdAt
   };
   assistencias.push(newAssistencia);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(assistencias));
+  emitAssistenciasUpdate();
   return newAssistencia;
 }
 
@@ -42,6 +79,7 @@ export function updateAssistencia(id: string, data: Partial<Assistencia>): Assis
   const updated = { ...assistencias[index], ...data, updatedAt: new Date().toISOString() };
   assistencias[index] = updated;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(assistencias));
+  emitAssistenciasUpdate();
   return updated;
 }
 
@@ -50,6 +88,7 @@ export function deleteAssistencia(id: string): boolean {
   const filtered = assistencias.filter(a => a.id !== id);
   if (filtered.length === assistencias.length) return false;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  emitAssistenciasUpdate();
   return true;
 }
 

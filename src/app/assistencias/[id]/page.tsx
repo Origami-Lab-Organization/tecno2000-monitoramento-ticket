@@ -74,7 +74,7 @@ export default function AssistenciaDetailPage() {
 
   if (!at) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
@@ -134,7 +134,7 @@ export default function AssistenciaDetailPage() {
                     <button
                       onClick={handleSaveStatus}
                       disabled={savingStatus}
-                      className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1 text-xs font-medium text-white bg-brand hover:bg-brand-dark px-2.5 py-1.5 rounded-lg transition-colors"
                     >
                       <Save className="w-3 h-3" />Salvar
                     </button>
@@ -184,7 +184,7 @@ export default function AssistenciaDetailPage() {
             {/* Dados da Ocorrência */}
             <div className="card p-6">
               <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-blue-600" />Dados da Ocorrência
+                <FileText className="w-4 h-4 text-brand" />Dados da Ocorrência
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
                 <DetailField label="Data Emissão" value={formatDate(at.dataEmissao)} />
@@ -240,7 +240,7 @@ export default function AssistenciaDetailPage() {
             {/* Dados do Pedido */}
             <div className="card p-6">
               <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-blue-600" />Dados do Pedido
+                <FileText className="w-4 h-4 text-brand" />Dados do Pedido
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <DetailField label="Pedido" value={at.pedido} />
@@ -254,7 +254,7 @@ export default function AssistenciaDetailPage() {
             {/* Dados do Item */}
             <div className="card p-6">
               <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Package className="w-4 h-4 text-purple-600" />Dados do Item
+                <Package className="w-4 h-4 text-brand" />Dados do Item
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <DetailField label="Item" value={at.item} />
@@ -270,7 +270,7 @@ export default function AssistenciaDetailPage() {
           <div className="space-y-6">
             <div className="card p-6">
               <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <User className="w-4 h-4 text-green-600" />Cliente
+                <User className="w-4 h-4 text-brand" />Cliente
               </h2>
               <div className="space-y-3">
                 <DetailField label="Cliente" value={at.cliente} />
@@ -281,7 +281,7 @@ export default function AssistenciaDetailPage() {
 
             <div className="card p-6">
               <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Truck className="w-4 h-4 text-indigo-600" />Logística
+                <Truck className="w-4 h-4 text-brand" />Logística
               </h2>
               <div className="space-y-3">
                 <DetailField label="Motorista Responsável" value={at.motoristaResponsavel} />
