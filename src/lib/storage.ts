@@ -1,8 +1,6 @@
 import { Assistencia } from '@/types/assistencia';
-import { mockAssistencias } from './mockData';
 
 const STORAGE_KEY = 'tecno2000_assistencias';
-const SEED_KEY = 'tecno2000_seeded';
 const STORAGE_EVENT = 'tecno2000-assistencias-updated';
 
 let cachedRawAssistencias: string | null | undefined;
@@ -33,14 +31,6 @@ function readAssistenciasFromStorage(): Assistencia[] {
   }
 
   return cachedAssistencias;
-}
-
-export function seedMockData(): void {
-  if (typeof window === 'undefined') return;
-  if (localStorage.getItem(SEED_KEY)) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(mockAssistencias));
-  localStorage.setItem(SEED_KEY, 'true');
-  emitAssistenciasUpdate();
 }
 
 export function getAssistencias(): Assistencia[] {

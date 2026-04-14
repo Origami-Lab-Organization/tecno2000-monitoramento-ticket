@@ -17,12 +17,12 @@ export default function Navbar() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-600 rounded-lg p-2">
+            <div className="bg-brand rounded-lg p-2">
               <Wrench className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="font-bold text-slate-900 text-lg">Tecno2000</span>
-              <span className="text-slate-400 text-sm ml-2">Assistência Técnica</span>
+              <span className="font-bold text-brand text-lg">Tecno2000</span>
+              <span className="text-gray-brand text-sm ml-2">Assistência Técnica</span>
             </div>
           </div>
 
@@ -36,7 +36,7 @@ export default function Navbar() {
                   href={item.href}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
                     isActive
-                      ? 'bg-blue-50 text-blue-700'
+                      ? 'bg-brand-light text-brand'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >

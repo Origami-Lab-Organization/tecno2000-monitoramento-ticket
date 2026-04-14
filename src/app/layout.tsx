@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import SeedProvider from "@/components/SeedProvider";
 
 export const metadata: Metadata = {
   title: "Tecno2000 - Gestão de Assistência Técnica",
@@ -15,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className="min-h-screen bg-slate-50">
-        <SeedProvider>{children}</SeedProvider>
+        {children}
       </body>
     </html>
   );

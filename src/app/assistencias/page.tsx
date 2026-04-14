@@ -112,7 +112,7 @@ export default function AssistenciasPage() {
                   {filtered.map((at) => (
                     <tr
                       key={at.id}
-                      className="hover:bg-blue-50/40 transition-colors duration-150 cursor-pointer group"
+                      className="hover:bg-brand-50/40 transition-colors duration-150 cursor-pointer group"
                       onClick={() => window.location.href = `/assistencias/${at.id}`}
                     >
                       <td className="px-4 py-3 text-sm font-semibold text-slate-900 whitespace-nowrap">{at.pedido || '-'}</td>
@@ -136,7 +136,7 @@ export default function AssistenciasPage() {
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Link
                             href={`/assistencias/${at.id}`}
-                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-500 hover:text-brand hover:bg-brand-50 rounded-lg transition-colors"
                             title="Ver detalhes"
                           >
                             <Eye className="w-4 h-4" />

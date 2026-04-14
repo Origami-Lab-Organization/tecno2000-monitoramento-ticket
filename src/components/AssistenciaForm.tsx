@@ -121,7 +121,7 @@ export default function AssistenciaForm({ assistencia, mode }: Props) {
       {/* Section 1: Dados do Pedido */}
       <div className="card p-6">
         <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">1</span>
+          <span className="w-6 h-6 bg-brand-100 text-brand rounded-full flex items-center justify-center text-xs font-bold">1</span>
           Dados do Pedido
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -218,7 +218,7 @@ export default function AssistenciaForm({ assistencia, mode }: Props) {
       {/* Section 2: Dados do Cliente */}
       <div className="card p-6">
         <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+          <span className="w-6 h-6 bg-brand-100 text-brand rounded-full flex items-center justify-center text-xs font-bold">2</span>
           Dados do Cliente
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -286,7 +286,7 @@ export default function AssistenciaForm({ assistencia, mode }: Props) {
       {/* Section 3: Dados do Item */}
       <div className="card p-6">
         <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold">3</span>
+          <span className="w-6 h-6 bg-brand-100 text-brand rounded-full flex items-center justify-center text-xs font-bold">3</span>
           Dados do Item
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -327,7 +327,7 @@ export default function AssistenciaForm({ assistencia, mode }: Props) {
       {/* Section 4: Assistência */}
       <div className="card p-6">
         <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-xs font-bold">4</span>
+          <span className="w-6 h-6 bg-brand-100 text-brand rounded-full flex items-center justify-center text-xs font-bold">4</span>
           Assistência Técnica
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -46,6 +46,10 @@ export interface Order {
   Status: OrderStatus[];
 }
 
+const PAGE_SIZE = 100;
+// Máximo de chamadas sequenciais ao cursor (cada uma retorna ~100 pedidos)
+const MAX_CALLS = 15;
+
 export async function GET(request: NextRequest) {
   const baseUrl = process.env.TUDO_ENTREGUE_BASE_URL;
   const appKey = process.env.TUDO_ENTREGUE_APP_KEY;
@@ -54,17 +58,15 @@ export async function GET(request: NextRequest) {
   if (!baseUrl || !appKey) {
     return Response.json(
       { error: 'Variáveis de ambiente do TudoEntregue não configuradas.' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
-  const params = new URLSearchParams();
   const { searchParams } = request.nextUrl;
-
-  ['phoneCountry', 'phoneNumber', 'orderType', 'orderID', 'partial'].forEach(key => {
-    const v = searchParams.get(key);
-    if (v) params.set(key, v);
-  });
+  const maxCalls = Math.min(
+    Number(searchParams.get('calls')) || 10,
+    MAX_CALLS,
+  );
 
   const headers: Record<string, string> = {
     AppKey: appKey,
@@ -72,17 +74,46 @@ export async function GET(request: NextRequest) {
   };
   if (requesterKey) headers.RequesterKey = requesterKey;
 
-  const url = `${baseUrl}/orders/finish${params.size ? `?${params}` : ''}`;
-  const res = await fetch(url, { headers });
+  const extraParams = new URLSearchParams();
+  ['phoneCountry', 'phoneNumber', 'orderType', 'orderID', 'partial'].forEach(
+    (key) => {
+      const v = searchParams.get(key);
+      if (v) extraParams.set(key, v);
+    },
+  );
 
-  if (!res.ok) {
-    const body = await res.text();
-    return Response.json(
-      { error: `TudoEntregue respondeu com status ${res.status}`, detail: body },
-      { status: res.status }
-    );
+  const url = `${baseUrl}/orders/finish${extraParams.size ? `?${extraParams}` : ''}`;
+
+  // A API do TudoEntregue usa cursor server-side:
+  // cada chamada sequencial retorna os próximos 100 pedidos.
+  const allOrders: Order[] = [];
+  const seenIds = new Set<string>();
+
+  for (let i = 0; i < maxCalls; i++) {
+    try {
+      const res = await fetch(url, { headers, cache: 'no-store' });
+      if (!res.ok) break;
+      const data: Order[] = await res.json();
+      if (!data.length) break;
+
+      // Deduplica por OrderID (cursor pode repetir nas bordas)
+      let newCount = 0;
+      for (const order of data) {
+        if (!seenIds.has(order.OrderID)) {
+          seenIds.add(order.OrderID);
+          allOrders.push(order);
+          newCount++;
+        }
+      }
+
+      // Se não veio nenhum novo, paramos
+      if (newCount === 0) break;
+      // Se retornou menos que PAGE_SIZE, acabou
+      if (data.length < PAGE_SIZE) break;
+    } catch {
+      break;
+    }
   }
 
-  const data: Order[] = await res.json();
-  return Response.json(data);
+  return Response.json(allOrders);
 }
