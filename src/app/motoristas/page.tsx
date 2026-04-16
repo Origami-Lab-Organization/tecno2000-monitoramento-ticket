@@ -3,15 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import {
+  BarChart3,
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   Image as ImageIcon,
   Loader2,
   MapPin,
   ShieldAlert,
+  TrendingDown,
   Truck,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 /* ── Tipos da API TudoEntregue ── */
 
@@ -58,12 +68,14 @@ interface TudoEntregueOrder {
     DocumentDescription: string;
     Volume: number;
     Weight: number;
+    DocumentValue: number;
   }[];
   Occurrences: TudoEntregueOccurrence[];
   Status: TudoEntregueStatus[];
   DepartureDate: string;
   ScheduleDate: string;
   TrackingUrl: string;
+  ATCost?: number;
 }
 
 /* ── Tipos internos do dashboard ── */
@@ -78,6 +90,8 @@ interface OrderRow {
   ultimoStatus: string;
   occurrences: TudoEntregueOccurrence[];
   trackingUrl: string;
+  orderValue: number;
+  atCost: number;
 }
 
 interface DriverRow {
@@ -94,6 +108,9 @@ interface DriverRow {
   orders: OrderRow[];
   occurrenceCounts: Record<string, number>;
   atCounts: Record<string, number>;
+  valorTransportado: number;
+  valorATs: number;
+  totalEntregasTodas: number;
 }
 
 /* ── Helpers ── */
@@ -101,6 +118,26 @@ interface DriverRow {
 function formatDate(value: string) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("pt-BR");
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+function formatCurrencyShort(value: number) {
+  if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `R$ ${(value / 1_000).toFixed(0)}k`;
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 }
 
 function parseTags(tags: string): string[] {
@@ -117,21 +154,6 @@ function getLastStatus(statuses: TudoEntregueStatus[]): string {
     (a, b) => new Date(b.Date).getTime() - new Date(a.Date).getTime()
   );
   return sorted[0].StatusDescription;
-}
-
-function getDriverTone(row: DriverRow) {
-  if (row.totalATs > 0) {
-    return {
-      ring: "ring-rose-200",
-      glow: "from-rose-500/20 via-rose-400/10 to-transparent",
-      bar: "from-rose-500 to-amber-400",
-    };
-  }
-  return {
-    ring: "ring-emerald-200",
-    glow: "from-emerald-500/20 via-emerald-400/10 to-transparent",
-    bar: "from-emerald-500 to-teal-400",
-  };
 }
 
 // Códigos de ocorrência que fazem parte do fluxo normal de entrega
@@ -154,6 +176,75 @@ function getOccColor(occ: TudoEntregueOccurrence) {
 }
 
 /* ── Cache local (localStorage, TTL 5 min) ── */
+
+/* ── Tooltip personalizado: Custo AT × Valor Transportado ── */
+
+interface ChartEntry {
+  name: string;
+  value: number;
+  color: string;
+  payload: { nome: string; valorTransportado: number; valorATs: number; pct: number };
+}
+
+function TooltipCustoAT({ active, payload }: { active?: boolean; payload?: ChartEntry[] }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  const fmt = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xl text-xs min-w-[210px]">
+      <p className="font-black text-slate-900 mb-2 text-sm truncate">{d.nome}</p>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-500">Valor Transportado</span>
+          <span className="font-bold text-slate-700">{fmt(d.valorTransportado)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-500">Custo ATs</span>
+          <span className="font-bold text-slate-700">{fmt(d.valorATs)}</span>
+        </div>
+      </div>
+      <p className="mt-1.5 pt-1.5 border-t border-slate-100 font-semibold text-rose-500">
+        {d.pct.toFixed(1)}% do valor transportado
+      </p>
+    </div>
+  );
+}
+
+/* ── Tooltip personalizado: Volume ATs × Valor Transportado ── */
+
+interface ChartEntryVolume {
+  name: string;
+  value: number;
+  color: string;
+  payload: { nome: string; totalATs: number; valorTransportado: number; ratio: number };
+}
+
+function TooltipVolumeAT({ active, payload }: { active?: boolean; payload?: ChartEntryVolume[] }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xl text-xs min-w-[210px]">
+      <p className="font-black text-slate-900 mb-2 text-sm truncate">{d.nome}</p>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-500">ATs / R$100k transp.</span>
+          <span className="font-bold text-rose-600">{d.ratio.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-500">Total de ATs</span>
+          <span className="font-bold text-slate-700">{d.totalATs}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-slate-500">Valor Transportado</span>
+          <span className="font-bold text-slate-700">
+            {d.valorTransportado.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ── Componente principal ── */
 
@@ -181,6 +272,12 @@ export default function MotoristasPage() {
       o.Occurrences.some((occ) => isAssistenciaTecnica(occ))
     );
 
+    const totalOrdersByDriver = new Map<string, number>();
+    orders.forEach((o) => {
+      const key = o.Driver?.Name?.trim().toLowerCase();
+      if (key) totalOrdersByDriver.set(key, (totalOrdersByDriver.get(key) ?? 0) + 1);
+    });
+
     const map = new Map<string, { driver: TudoEntregueOrder["Driver"]; orders: TudoEntregueOrder[] }>();
 
     ordersWithOcc.forEach((order) => {
@@ -205,6 +302,8 @@ export default function MotoristasPage() {
         const destinoMap = new Map<string, number>();
         let entregues = 0;
         let totalATs = 0;
+        let valorTransportado = 0;
+        let valorATs = 0;
 
         const orderRows: OrderRow[] = sorted.map((order) => {
           const lastStatus = getLastStatus(order.Status);
@@ -216,6 +315,11 @@ export default function MotoristasPage() {
           if (dest?.Name) {
             destinoMap.set(dest.Name, (destinoMap.get(dest.Name) || 0) + 1);
           }
+
+          const orderValue = order.Documents?.[0]?.DocumentValue ?? 0;
+          const orderAtCost = order.ATCost ?? 0;
+          valorTransportado += orderValue;
+          valorATs += orderAtCost;
 
           order.Occurrences.forEach((occ) => {
             const desc = occ.OccurrenceDescription?.trim() || "Sem descrição";
@@ -237,6 +341,8 @@ export default function MotoristasPage() {
             ultimoStatus: lastStatus,
             occurrences: order.Occurrences,
             trackingUrl: order.TrackingUrl || "",
+            orderValue,
+            atCost: orderAtCost,
           };
         });
 
@@ -262,6 +368,9 @@ export default function MotoristasPage() {
           orders: orderRows,
           occurrenceCounts,
           atCounts,
+          valorTransportado,
+          valorATs,
+          totalEntregasTodas: totalOrdersByDriver.get(driver.Name?.trim().toLowerCase() ?? "") ?? 0,
         };
       })
       .sort(
@@ -293,6 +402,9 @@ export default function MotoristasPage() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
 
+    const totalValorTransportado = rows.reduce((s, r) => s + r.valorTransportado, 0);
+    const totalValorATs = rows.reduce((s, r) => s + r.valorATs, 0);
+
     return {
       rows,
       filteredRows,
@@ -303,6 +415,8 @@ export default function MotoristasPage() {
       highestTotal,
       spotlight,
       topOccurrences,
+      totalValorTransportado,
+      totalValorATs,
     };
   }, [orders]);
 
@@ -331,7 +445,7 @@ export default function MotoristasPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="text-center">
                 <p className="text-3xl font-black">{loading ? "-" : dashboard.rows.length}</p>
                 <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Motoristas</p>
@@ -340,6 +454,25 @@ export default function MotoristasPage() {
               <div className="text-center">
                 <p className="text-3xl font-black text-rose-300">{loading ? "-" : dashboard.totalATs}</p>
                 <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Assist. Técnicas</p>
+              </div>
+              <div className="h-10 w-px bg-white/20" />
+              <div className="text-center">
+                <p className="text-2xl font-black ">
+                  {loading ? "-" : formatCurrencyShort(dashboard.totalValorTransportado)}
+                </p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Valor Transportado</p>
+              </div>
+              <div className="h-10 w-px bg-white/20" />
+              <div className="text-center">
+                <p className="text-2xl font-black text-rose-300">
+                  {loading ? "-" : formatCurrencyShort(dashboard.totalValorATs)}
+                </p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Custo Total ATs</p>
+                {!loading && dashboard.totalValorTransportado > 0 && (
+                  <p className="text-[11px] text-rose-300 font-semibold">
+                    {((dashboard.totalValorATs / dashboard.totalValorTransportado) * 100).toFixed(1)}% da carga
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -364,6 +497,135 @@ export default function MotoristasPage() {
           </div>
         )}
 
+        {/* ── Gráficos financeiros ── */}
+        {!loading && !error && dashboard.rows.length > 0 && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Chart 1: Custo AT × Valor Transportado */}
+            <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur-sm">
+              <div className="mb-1">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-brand" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
+                    Impacto Financeiro
+                  </p>
+                </div>
+                <h2 className="mt-1 text-lg font-black tracking-tight text-slate-900">
+                  Custo AT × Valor Transportado
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Passe o mouse sobre as barras para ver mais informações
+                </p>
+              </div>
+              <div className="mb-3 mt-3 flex items-center gap-4">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="h-3 w-3 rounded-sm bg-rose-500 inline-block" />
+                  % do valor transportado em ATs
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart
+                  data={[...dashboard.rows]
+                    .map((row) => ({
+                      nome: row.nome,
+                      valorTransportado: row.valorTransportado,
+                      valorATs: row.valorATs,
+                      pct:
+                        row.valorTransportado > 0
+                          ? +((row.valorATs / row.valorTransportado) * 100).toFixed(2)
+                          : 0,
+                    }))
+                    .sort((a, b) => b.pct - a.pct)}
+                  margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis
+                    dataKey="nome"
+                    axisLine={false}
+                    tickLine={false}
+                    interval={0}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tickFormatter={(nome: string) => nome.split(" ")[0]}
+                    angle={-30}
+                    textAnchor="end"
+                    height={52}
+                  />
+                  <YAxis
+                    tickFormatter={(v: number) => `${v}%`}
+                    tick={{ fontSize: 10, fill: "#94a3b8" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                  />
+                  <Tooltip content={(props) => <TooltipCustoAT {...(props as unknown as Parameters<typeof TooltipCustoAT>[0])} />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                  <Bar dataKey="pct" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={44} name="% Custo ATs" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Chart 2: Volume ATs × Valor Transportado */}
+            <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur-sm">
+              <div className="mb-1">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-brand" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
+                    Frequência de Perdas
+                  </p>
+                </div>
+                <h2 className="mt-1 text-lg font-black tracking-tight text-slate-900">
+                  Volume ATs × Valor Transportado
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  ATs por R$100k transportado — menor índice é melhor
+                </p>
+              </div>
+              <div className="mb-3 mt-3 flex items-center gap-4">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="h-3 w-3 rounded-sm bg-rose-500 inline-block" />
+                  ATs / R$100k transportado
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart
+                  data={[...dashboard.rows]
+                    .map((row) => ({
+                      nome: row.nome,
+                      totalATs: row.totalATs,
+                      valorTransportado: row.valorTransportado,
+                      ratio:
+                        row.valorTransportado > 0
+                          ? +(row.totalATs / (row.valorTransportado / 100_000)).toFixed(2)
+                          : 0,
+                    }))
+                    .sort((a, b) => b.ratio - a.ratio)}
+                  margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis
+                    dataKey="nome"
+                    axisLine={false}
+                    tickLine={false}
+                    interval={0}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tickFormatter={(nome: string) => nome.split(" ")[0]}
+                    angle={-30}
+                    textAnchor="end"
+                    height={52}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#94a3b8" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                    tickFormatter={(v: number) => v.toFixed(1)}
+                  />
+                  <Tooltip content={(props) => <TooltipVolumeAT {...(props as unknown as Parameters<typeof TooltipVolumeAT>[0])} />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                  <Bar dataKey="ratio" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={56} name="ATs/R$100k" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         {/* ── Main content ── */}
         {!loading && !error && (
           <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
@@ -381,14 +643,32 @@ export default function MotoristasPage() {
               </div>
 
               {/* Card resumo */}
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Motoristas</p>
                   <p className="mt-2 text-3xl font-black text-slate-900">{dashboard.rows.length}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Assist. Técnicas</p>
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Assist. Técnicas</p>
                   <p className="mt-2 text-3xl font-black text-rose-600">{dashboard.totalATs}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Valor Transportado</p>
+                  <p className="mt-2 text-2xl font-black text-slate-800">
+                    {formatCurrencyShort(dashboard.totalValorTransportado)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">pedidos com ATs</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Custo Total ATs</p>
+                  <p className="mt-2 text-2xl font-black text-slate-800">
+                    {formatCurrencyShort(dashboard.totalValorATs)}
+                  </p>
+                  {dashboard.totalValorTransportado > 0 && (
+                    <p className="mt-0.5 text-[11px] font-semibold text-rose-500">
+                      {((dashboard.totalValorATs / dashboard.totalValorTransportado) * 100).toFixed(1)}% do valor transportado
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -406,24 +686,17 @@ export default function MotoristasPage() {
                   </div>
                 ) : (
                   dashboard.filteredRows.map((row, index) => {
-                    const tone = getDriverTone(row);
-
                     return (
                       <div
                         key={row.nome}
                         className={`group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
-                          expanded === row.nome ? `ring-2 ${tone.ring}` : ""
+                          expanded === row.nome ? "ring-2 ring-brand-200" : ""
                         }`}
                       >
                         <button
                           onClick={() => toggle(row.nome)}
                           className="w-full p-4 text-left sm:p-5"
                         >
-                          <div
-                            className={`absolute inset-0 bg-gradient-to-r ${tone.glow} opacity-0 transition-opacity duration-200 group-hover:opacity-100 ${
-                              expanded === row.nome ? "opacity-100" : ""
-                            }`}
-                          />
                           <div className="relative">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                               <div className="min-w-0 flex-1">
@@ -451,14 +724,36 @@ export default function MotoristasPage() {
                                   </div>
                                 </div>
 
-                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                  <div className="rounded-2xl bg-rose-50 px-3 py-2 text-center">
+                                <div className="mt-4 grid gap-3 grid-cols-2 lg:grid-cols-4">
+                                  <div className="rounded-2xl bg-rose-50 border border-rose-100 px-3 py-2 text-center">
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600">Assist. Técnicas</p>
                                     <p className="mt-1 text-lg font-black text-rose-700">{row.totalATs}</p>
+                                    <p className="text-[10px] text-rose-400">
+                                      assistências relatadas
+                                    </p>
                                   </div>
-                                  <div className="rounded-2xl bg-slate-50 px-3 py-2 text-center">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Última entrega</p>
-                                    <p className="mt-1 text-sm font-bold text-slate-900">{formatDate(row.orders[0]?.dataPartida)}</p>
+                                  <div className="rounded-2xl bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Entregas</p>
+                                    <p className="mt-1 text-lg font-black text-slate-900">{row.totalOcorrencias}</p>
+                                    <p className="text-[10px] text-slate-400">ocorrências totais</p>
+                                  </div>
+                                  <div className="rounded-2xl bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Valor Transportado</p>
+                                    <p className="mt-1 text-base font-black text-slate-800">
+                                      {formatCurrencyShort(row.valorTransportado)}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400">em carga transport.</p>
+                                  </div>
+                                  <div className="rounded-2xl bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Custo ATs</p>
+                                    <p className="mt-1 text-base font-black text-slate-800">
+                                      {formatCurrencyShort(row.valorATs)}
+                                    </p>
+                                    <p className="text-[10px] font-semibold text-rose-500">
+                                      {row.valorTransportado > 0
+                                        ? `${((row.valorATs / row.valorTransportado) * 100).toFixed(1)}% da carga`
+                                        : "–"}
+                                    </p>
                                   </div>
                                 </div>
                               </div>
@@ -483,7 +778,7 @@ export default function MotoristasPage() {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                                     <ShieldAlert className="h-4 w-4 text-brand" />
-                                    Resumo de ocorrências
+                                    Resumo de entregas
                                   </div>
                                   <span className="text-xs font-semibold text-slate-500">
                                     {Object.values(row.occurrenceCounts).reduce((a, b) => a + b, 0)} total
@@ -525,7 +820,7 @@ export default function MotoristasPage() {
                                 {/* Fluxo normal de entrega */}
                                 <div className="mt-4">
                                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 mb-2">
-                                    Fluxo de entrega
+                                    Entregas finalizadas
                                   </p>
                                   <div className="grid gap-1.5">
                                     {Object.entries(row.occurrenceCounts)
@@ -562,7 +857,7 @@ export default function MotoristasPage() {
                               <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white">
                                 <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
                                   <p className="text-sm font-black text-slate-900">
-                                    Pedidos do motorista
+                                    Pedidos com ocorrências
                                   </p>
                                   <p className="text-xs text-slate-500">
                                     {row.orders.length} pedido(s) — clique para ver ocorrências
@@ -736,13 +1031,14 @@ export default function MotoristasPage() {
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0 ml-2">
                               {row.totalATs > 0 && (
-                                <span className="text-xs font-bold text-rose-600">
+                                <span className="text-xs font-bold text-rose-600 w-full">
                                   {row.totalATs} AT{row.totalATs !== 1 ? "s" : ""}
                                 </span>
                               )}
-                              <span className="text-sm font-black text-slate-900 w-8 text-right">
-                                {row.totalOcorrencias}
-                              </span>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-[13px] font-black text-slate-900">{row.totalOcorrencias}</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">entregas</span>
+                              </div>
                             </div>
                           </div>
                           <div className="mt-1.5 ml-8 h-1.5 rounded-full bg-slate-100">
@@ -769,13 +1065,13 @@ export default function MotoristasPage() {
                         <p className="max-w-[80%] font-semibold text-slate-700">
                           {desc}
                         </p>
-                        <span className="text-xs font-bold uppercase tracking-[0.18em] text-rose-500">
+                        <span className="text-xs font-bold uppercase tracking-[0.18em] text-brand">
                           {count}
                         </span>
                       </div>
                       <div className="mt-2 h-2 rounded-full bg-slate-100">
                         <div
-                          className="h-2 rounded-full bg-gradient-to-r from-rose-500 to-rose-300"
+                          className="h-2 rounded-full bg-gradient-to-r from-brand to-brand-300"
                           style={{
                             width: `${
                               (count /

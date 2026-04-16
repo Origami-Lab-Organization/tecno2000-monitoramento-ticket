@@ -20,6 +20,7 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  --primary: 193 100% 23%;
 }
 
 body {

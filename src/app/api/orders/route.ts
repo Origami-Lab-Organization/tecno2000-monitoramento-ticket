@@ -44,6 +44,19 @@ const OCC_TYPES = {
   OUTROS: { code: "99", desc: "OUTROS", finisher: false, reportProblem: false },
 };
 
+// Custo estimado por tipo de AT (min, max em R$) — mock para apresentação gerencial
+const AT_COST_RANGES: Record<string, [number, number]> = {
+  TRANSBORDO:      [200,   700],
+  CLIENTE_RECUSOU: [400,  2200],
+  DIVERGENCIA:     [900,  5500],
+  SINISTRO:        [12000, 58000],
+  NAO_ENVIADA:     [200,  1100],
+  RETORNO:         [850,  3200],
+  DEVOLUCAO:       [1100, 5800],
+  DESCARTE:        [600,  2800],
+  OUTROS:          [300,  1600],
+};
+
 function randomDate(start: string, end: string) {
   const s = new Date(start).getTime();
   const e = new Date(end).getTime();
@@ -51,6 +64,11 @@ function randomDate(start: string, end: string) {
 }
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// Arredonda para o múltiplo de 50 mais próximo
+function randomInRange(min: number, max: number): number {
+  return Math.round((min + Math.random() * (max - min)) / 50) * 50;
+}
 
 function generateOrders() {
   const orders: Record<string, unknown>[] = [];
@@ -145,7 +163,7 @@ function generateOrders() {
         OrderID: id,
         OrderNumber: id,
         OrderDescription: "NF-e",
-        Documents: [{ DocumentID: `doc-${id}`, DocumentNumber: String(5000 + Number(id) % 1000), DocumentDescription: "Outro", Volume: 1 + Math.floor(Math.random() * 10), Weight: 10 + Math.random() * 200 }],
+        Documents: [{ DocumentID: `doc-${id}`, DocumentNumber: String(5000 + Number(id) % 1000), DocumentDescription: "Outro", Volume: 1 + Math.floor(Math.random() * 10), Weight: 10 + Math.random() * 200, DocumentValue: randomInRange(5000, 75000) }],
         Occurrences: occs,
         Status: [
           { Status: 5, StatusDescription: "Finalizada pelo Motorista", Date: occDate },
@@ -155,17 +173,21 @@ function generateOrders() {
         DepartureDateUTC: depDate,
         ScheduleDate: depDate,
         TrackingUrl: "",
+        ATCost: 0,
       });
     }
 
     // Pedidos com AT
     for (const at of cfg.ats) {
       const occType = OCC_TYPES[at.type as keyof typeof OCC_TYPES];
+      const [costMin, costMax] = AT_COST_RANGES[at.type] ?? [300, 1500];
+
       for (let i = 0; i < at.count; i++) {
         const id = String(orderId++);
         const dest = pick(DESTINATIONS);
         const depDate = randomDate("2024-01-01", "2025-04-14");
         const occDate = new Date(new Date(depDate).getTime() + 86400000 * (1 + Math.random() * 3)).toISOString();
+        const atCost = randomInRange(costMin, costMax);
 
         const occs: Record<string, unknown>[] = [
           {
@@ -210,7 +232,7 @@ function generateOrders() {
           OrderID: id,
           OrderNumber: id,
           OrderDescription: "NF-e",
-          Documents: [{ DocumentID: `doc-${id}`, DocumentNumber: String(5000 + Number(id) % 1000), DocumentDescription: "Outro", Volume: 1 + Math.floor(Math.random() * 10), Weight: 10 + Math.random() * 200 }],
+          Documents: [{ DocumentID: `doc-${id}`, DocumentNumber: String(5000 + Number(id) % 1000), DocumentDescription: "Outro", Volume: 1 + Math.floor(Math.random() * 10), Weight: 10 + Math.random() * 200, DocumentValue: randomInRange(5000, 75000) }],
           Occurrences: occs,
           Status: [
             { Status: 5, StatusDescription: "Finalizada pelo Motorista", Date: occDate },
@@ -220,6 +242,7 @@ function generateOrders() {
           DepartureDateUTC: depDate,
           ScheduleDate: depDate,
           TrackingUrl: "",
+          ATCost: atCost,
         });
       }
     }
